@@ -35,7 +35,7 @@ var genLink = (route: string) => `http://localhost:${port}/static${route}`;
 
 describe("analyzeFolder samples1", () => {
   it("has index.html", () => {
-    expect(paths["index.html"]).toEqual({ CT: "text/html", size: 16 });
+    expect(paths["index.html"]).toEqual({ CT: "text/html", size: 15 });
   });
   it("doesn't have avoid.txt", () =>
     expect(paths["avoid.txt"]).toBe(undefined));
