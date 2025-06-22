@@ -1,0 +1,30 @@
+{
+  "name": "@ublitzjs/static",
+  "version": "0.0.1",
+  "dependencies": {
+    "mrmime": "^2.0.1",
+    "@ublitzjs/core": "^0.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.4",
+    "vitest": "^3.1.4",
+    "undici": "^7.10.0"
+  },
+  "exports": {
+    "types": "./index.d.ts",
+    "import": "./index.mjs",
+    "require": "./index.cjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ublitzjs/static.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ublitzjs/static/issues",
+    "email": "diril656@gmail.com"
+  },
+  "homepage": "https://github.com/ublitzjs/static#readme"
+}

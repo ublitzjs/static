@@ -1,0 +1,4 @@
+package-lock.json
+bun.*
+*.mp4
+node_modules
