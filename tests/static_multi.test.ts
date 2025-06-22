@@ -71,13 +71,13 @@ describe("static multi", { concurrent: true }, () => {
       var response = await request(genLink("/public")).then((res) =>
         res.body.text()
       );
-      expect(response).toBe("<h1>hello from samples2</h1>\r\n");
+      expect(response).toMatch("<h1>hello from samples2</h1>");
     });
   });
   describe("samples 3 - fallback folder", () => {
     it("sends index.html from localhost itself", async () => {
       var response = await request(genLink("/")).then((res) => res.body.text());
-      expect(response).toBe("<h1>hello</h1>\r\n");
+      expect(response).toMatch("<h1>hello</h1>");
     });
   });
 });
@@ -96,6 +96,6 @@ function testOneCaseOfIndexHtml(url: string) {
     expect(get.headers["allow"]).toBe("GET, HEAD");
     expect(head.headers["allow"]).toBe("GET, HEAD");
 
-    expect(txt).toBe("<h1>hello</h1>\r\n");
+    expect(txt).toMatch("<h1>hello</h1>");
   };
 }

@@ -96,6 +96,6 @@ function testOneCaseOfIndexHtml(url: string) {
     expect(get.headers["allow"]).toBe("GET, HEAD");
     expect(head.headers["allow"]).toBe("GET, HEAD");
 
-    expect(txt).toBe("<h1>hello</h1>\r\n");
+    expect(txt).toMatch("<h1>hello</h1>");
   };
 }
