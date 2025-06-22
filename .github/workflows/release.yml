@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/
+        uses: actions/checkout@v4
       - name: setup Node.js
-        uses: actions/
+        uses: actions/setup-node@v4
       - name: install deps
         run: npm i
       - name: run test
