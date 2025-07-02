@@ -9,17 +9,37 @@ This package simplifies sending static content<br/>
 _basicSendFile_
 
 ```typescript
+import { HeadersMap } from "@ublitzjs/core";
 import { basicSendFile } from "@ublitzjs/static";
+import { stat } from "node:fs/promises";
 import { App } from "uWebSockets.js";
 var server = App();
 server.get(
-  "/index.html",
+  "/video.mp4",
   basicSendFile(
-    //path to file
-    "public/index.html",
-    // Content-Type
-    "text/html",
-    /*log if error occurs*/ true
+    {
+      path: "public/video.mp4",
+      contentType: "video/mp4",
+      /**max file size (or max size you wnat to send) */
+      maxSize: (await stat("video.mp4")).size,
+    },
+    /**additional options*/
+    {
+      headers: HeadersMap.default,
+      /**log errors to console */
+      logs: true,
+      /**can't send more than this IF Range header is present AND has no end specified */
+      maxChunk: 1024 * 1024,
+      /**whether Range header is required */
+      requireRange: true,
+    },
+    /**advanced memory options */
+    {
+      /**goes to createReadStream */
+      highWaterMark: 64 * 1024,
+      /**see this in index.d.ts. This value is default */
+      minQ: 32,
+    }
   ) as any
 );
 ```
@@ -28,20 +48,54 @@ Code snippet above is same as this:<br>
 _sendFile_
 
 ```typescript
-import { registerAbort } from "@ublitzjs/core";
-import { sendFile } from "@ublitzjs/static";
+import {
+  closure,
+  HeadersMap,
+  registerAbort,
+  type HttpRequest,
+  type HttpResponse,
+} from "@ublitzjs/core";
+import { getRanges, sendFile } from "@ublitzjs/static";
+import { stat } from "node:fs/promises";
 import { App } from "uWebSockets.js";
 var server = App();
-server.get("/index.html", async (res) => {
-  registerAbort(res);
-  const error = await sendFile({
-    res: res as any,
-    totalSize: Infinity,
-    contentType: "text/html",
-    path: "public/index.html",
-  });
-  if (error) console.error(error);
-});
+server.get(
+  "/video.mp4",
+  (await closure(async () => {
+    var maxSize = (await stat("public/video.mp4")).size;
+    var maxChunk = 1024 * 1024;
+    var logs = true;
+    var requireRange = true;
+    return async (res: HttpResponse, req: HttpRequest) => {
+      //#region get "Range" header
+      registerAbort(res);
+      var range = req.getHeader("range");
+      if (range) {
+        try {
+          var { 0: start, 1: end }: any = getRanges(
+            range,
+            maxSize - 1,
+            maxChunk
+          );
+          if (end - start + 1 > maxSize)
+            return res.cork(() =>
+              res.writeStatus("416").end("Range not satisfiable")
+            );
+        } catch (error) {
+          return res.writeStatus("400").end((error as any).message);
+        }
+      } else if (requireRange)
+        return res.writeStatus("400").end("Range header required");
+
+      //#endregion
+      var err = await sendFile(
+        { res, path: "public/video.mp4", maxSize, contentType: "video/mp4" },
+        { start, end, headers: HeadersMap.default }
+      );
+      if (err && logs) console.error("ERROR", err);
+    };
+  })) as any
+);
 ```
 
 ## analyzeFolder
@@ -76,42 +130,51 @@ _staticServe_
 
 ```typescript
 var server = App();
-var staticMethods = staticServe({
-  dirPath: "public",
-  fullRoute: "/prefix/public",
-  paths: await analyzeFolder("public", { deleteMimesList: false }),
-  logs: true, // log errors from get method
-});
+var staticMethods = staticServe(
+  {
+    dirPath: "public",
+    fullRoute: "/prefix/public", // url to look for
+    paths: await analyzeFolder("public", { deleteMimesList: false }), // files to serve
+  },
+  // additional options
+  {
+    logs: true, // log errors from get method
+    maxChunk: 1024 * 1024, // for range requests when no end byte is specified
+    headers: HeadersMap.default,
+  }
+);
 server
-  // finds file and sends
   .get("/*", staticMethods.get as any)
-  //finds file and sends size with Content-Type
   .head("/*", staticMethods.head as any)
   // if finds file - code 405 (wrong method), else - 404
   .any("/*", staticMethods.any as any);
 ```
 
-_staticServeMulti_
+_staticServeMulti_ (for better example - check "tests" folder)
 
 ```typescript
-var staticMethods = staticServeMulti({
-  folders: [
-    {
-      // goes to file system
-      dir: "public",
-      // another built-in method, which returns regex
-      // it hcecks the url. If matched - checks paths
-      regex: urlStartsWith("/prefix/public"),
+var staticMethods = staticServeMulti(
+  {
+    folders: [
+      {
+        // goes to file system
+        dir: "public",
+        // another built-in method, which returns regex
+        // it hcecks the url. If matched - checks paths
+        regex: urlStartsWith("/prefix/public"),
 
-      paths: await analyzeFolder("public", { deleteMimesList: false }),
+        paths: await analyzeFolder("public", { deleteMimesList: false }),
+      },
+    ],
+    // checks url when other folders failed.
+    fallback: {
+      dir: "meta",
+      paths: await analyzeFolder("meta", { deleteMimesList: true }),
     },
-  ],
-  // checks url when other folders failed.
-  fallback: {
-    dir: "meta",
-    paths: await analyzeFolder("meta", { deleteMimesList: true }),
   },
-});
+  // additional options as before... they are OPTIONAL
+  {}
+);
 server
   .get("/*", staticMethods.get as any)
   .head("/*", staticMethods.head as any)
@@ -134,6 +197,9 @@ var dynamicMethods = dynamicServe(
     headers: new HeadersMap({ ...HeadersMap.baseObj })
       .remove("Cross-Origin-Opener-Policy")
       .prepare(),
+    maxChunk: 1024 * 1024,
+    // if Range header is required (if uploads are large videos, then it needs to be required)
+    requireRange: true,
   }
 );
 server

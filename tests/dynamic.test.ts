@@ -6,7 +6,8 @@ import {
   us_socket_local_port,
   type us_listen_socket,
 } from "uWebSockets.js";
-import { dynamicServe, urlStartsWith } from "../index.mjs";
+import { dynamicServe } from "../mjs/serving.mjs";
+import { urlStartsWith } from "../mjs/helpers.mjs";
 import { HeadersMap } from "@ublitzjs/core";
 import { unlink, writeFile } from "node:fs/promises";
 var socket: us_listen_socket;
@@ -51,6 +52,19 @@ describe("dynamic version", { concurrent: true }, () => {
       "sends index.html using directory url without slash",
       testOneCaseOfIndexHtml("/uploads")
     );
+    it("accepts range request", async () => {
+      var link = genLink("/uploads/index.html");
+      var response = await request(link, {
+        method: "GET",
+        headers: {
+          Range: "bytes=0-3",
+        },
+      });
+      expect(response.headers["accept-ranges"]).toBe("bytes");
+      expect(response.headers["content-range"]).toMatch("bytes 0-3/");
+      expect(response.headers["content-length"]).toBe("4");
+      expect(await response.body.text()).toBe("<h1>");
+    });
   });
   it("sends recently created files", async () => {
     await writeFile("tests/samples3/new.txt", "hello");
@@ -89,7 +103,6 @@ function testOneCaseOfIndexHtml(url: string) {
       request(link, { method: "HEAD" }),
     ]);
     const txt = await get.body.text();
-
     expect(get.statusCode).toBe(200);
     expect(head.statusCode).toBe(200);
 

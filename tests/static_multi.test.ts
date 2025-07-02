@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { request } from "undici";
-import { staticServeMulti, analyzeFolder, urlStartsWith } from "../index.mjs";
+import { staticServeMulti, analyzeFolder } from "../mjs/serving.mjs";
+import { urlStartsWith } from "../mjs/helpers.mjs";
 import {
   App,
   us_listen_socket_close,
@@ -65,6 +66,19 @@ describe("static multi", { concurrent: true }, () => {
       "sends index.html using directory url without slash",
       testOneCaseOfIndexHtml("/static")
     );
+    it("accepts range request", async () => {
+      var link = genLink("/static/index.html");
+      var response = await request(link, {
+        method: "GET",
+        headers: {
+          Range: "bytes=0-3",
+        },
+      });
+      expect(response.headers["accept-ranges"]).toBe("bytes");
+      expect(response.headers["content-range"]).toMatch("bytes 0-3/");
+      expect(response.headers["content-length"]).toBe("4");
+      expect(await response.body.text()).toBe("<h1>");
+    });
   });
   describe("samples 2 - second folder", () => {
     it("just sends index.html form another folder", async () => {

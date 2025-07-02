@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { request } from "undici";
-import { staticServe, analyzeFolder } from "../index.mjs";
+import { staticServe, analyzeFolder } from "../mjs/serving.mjs";
 import {
   App,
   us_listen_socket_close,
@@ -35,7 +35,7 @@ var genLink = (route: string) => `http://localhost:${port}/static${route}`;
 
 describe("analyzeFolder samples1", () => {
   it("has index.html", () => {
-    expect(paths["index.html"]).toEqual({ CT: "text/html", size: 15 });
+    expect(paths["index.html"]).toEqual({ CT: "text/html", size: 16 });
   });
   it("doesn't have avoid.txt", () =>
     expect(paths["avoid.txt"]).toBe(undefined));
@@ -56,6 +56,19 @@ describe("staticServe", { concurrent: true }, () => {
     "sends index.html using directory url without slash",
     testOneCaseOfIndexHtml("")
   );
+  it("accepts range request", async () => {
+    var link = genLink("/index.html");
+    var response = await request(link, {
+      method: "GET",
+      headers: {
+        Range: "bytes=0-3",
+      },
+    });
+    expect(response.headers["accept-ranges"]).toBe("bytes");
+    expect(response.headers["content-range"]).toMatch("bytes 0-3/");
+    expect(response.headers["content-length"]).toBe("4");
+    expect(await response.body.text()).toBe("<h1>");
+  });
   it("actually doesn't send anything, absent in paths", async () => {
     var response = await request(genLink("/avoid.txt"));
     expect(response.statusCode).toBe(404);
