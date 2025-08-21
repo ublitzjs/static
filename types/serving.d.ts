@@ -3,9 +3,15 @@ import type { HttpResponse as uwsHttpResponse } from "uWebSockets.js";
 type fileData<full extends boolean> = {
   CT: string;
   size: number;
-} & full extends true
-  ? Record<"atime" | "ctime" | "mtime" | "birthtime", string>
-  : {};
+} & (
+  full extends true
+  ? {
+    "atime": string;
+    "ctime" :string;
+    "mtime":string;
+    "birthtime":string;
+  }
+  : {});
 /**
  * recursively analyses folder for all files.
  * @param dirPath has same constraints, as "fullRoute" for staticServe
@@ -15,7 +21,7 @@ type fileData<full extends boolean> = {
  * @example
  * {"src/index.html": { CT: "text/html", size: 100}, "src/main.js": {CT:"text/javascript", size: 467 } }
  */
-export function analyzeFolder(
+export function analyzeFolder<full extends boolean | undefined>(
   dirPath: string,
   opts: {
     deleteMimesList: boolean;
@@ -23,10 +29,10 @@ export function analyzeFolder(
     /**
      * whether include 'atime, mtime, ctime, birthtime' of file system stats
      */
-    includeDates?: boolean;
+    includeDates?: full;
   }
 ): Promise<
-  Record<string, fileData<typeof opts.includeDates extends true ? true : false>>
+  Record<string, fileData<full extends true ? true : false>>
 >;
 /**
  * This function analyses folder, gets all essential metadata, and is suitable for cases, when no files are added or deleted in the directory.
