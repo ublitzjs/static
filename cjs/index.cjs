@@ -11,7 +11,7 @@ var fs = require("node:fs"),
   standardHighWaterMark = 65536;
 
 async function sendFile(
-  { res, path, maxSize, contentType = "application/octet-stream" },
+  { res, path, fd, maxSize, contentType = "application/octet-stream" },
   { start, end, headers } = {},
   memory = {}
 ) {
@@ -26,6 +26,7 @@ async function sendFile(
   }
   try {
     var readStream = fs.createReadStream(path, {
+      fd,
       highWaterMark: memory.highWaterMark || standardHighWaterMark,
       end,
       start,

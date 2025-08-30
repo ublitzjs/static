@@ -29,8 +29,19 @@ type memoryConfig = {
  * @param memoryOpts sendFile uses queues for chunks from files. You can adjust them.
  * @compatibilityChange version 0.1.0
  */
-export function sendFile(mainOpts: {
-  path: string;
+export function sendFile(mainOpts:
+  ({
+  /**
+   * Path to a file. Is provided, "fd" is ignored.
+   */
+  path:string
+}|{
+  /**
+   *File descriptor. If provided, "path" is ignored.
+   This function DOES NOT close this file descriptor after doing its job.
+  * */
+  fd: number
+}) & { 
   /**
    * @default "application/octet-stream"
    */
