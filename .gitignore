@@ -1,4 +1,6 @@
 package-lock.json
+
+sample-*
 bun.*
 *.mp4
 node_modules

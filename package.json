@@ -6,10 +6,15 @@
     "@ublitzjs/core": "~0.0.1"
   },
   "devDependencies": {
+    "@types/k6": "^1.2.0",
     "@types/node": "^24.3.0",
     "esbuild": "^0.25.4",
+    "tsx": "^4.20.5",
     "undici": "^7.10.0",
     "vitest": "^3.1.4"
+  },
+  "scripts": {
+    "test": "dd if=/dev/zero of=tests/k6/sample-file.txt bs=1M count=110 && vitest run"
   },
   "exports": {
     ".": {
