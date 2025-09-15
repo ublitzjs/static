@@ -168,6 +168,10 @@ function dynamicServe(routeRegex, dirPath, conf = {}) {
         var file = await stat(currentPath);
 
         if (file.isDirectory()) {
+          if(conf.noIndexHtml){
+            if(res.aborted) return;
+            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+          }
           //#region look for index.html
           let str = "";
           if (shouldAddDirSlash(currentPath)) str = "/";
@@ -232,6 +236,10 @@ function dynamicServe(routeRegex, dirPath, conf = {}) {
       try {
         var file = await stat(currentPath);
         if (file.isDirectory() /*get html*/) {
+          if(conf.noIndexHtml){
+            if(res.aborted) return;
+            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+          }
           let str = "";
           if (shouldAddDirSlash(currentPath)) str = "/";
           currentPath += str + "index.html";
@@ -258,6 +266,10 @@ function dynamicServe(routeRegex, dirPath, conf = {}) {
       try {
         var file = await stat(currentPath);
         if (file.isDirectory() /*get html*/) {
+          if(conf.noIndexHtml){
+            if(res.aborted) return;
+            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+          }
           let str = "";
           if (shouldAddDirSlash(currentPath)) str = "/";
           currentPath += str + "index.html";

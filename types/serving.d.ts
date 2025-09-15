@@ -103,6 +103,12 @@ export function dynamicServe(
    */
   logs?: boolean;
   /**
+  * whether to look for index.html if a request's url points to a directory. 
+  * @description if you the dir you serve has folders inside (like "folder") and the url is "/your_prefix/folder", then script will try to look for "folder/index.html", if options is set to false. If true - sends 404 code
+  * @default false
+  * */
+  noIndexHtml?: boolean;
+  /**
    * function which sets headers (like return of HeadersMap.prepare() )
    */
   headers?: setHeaders
