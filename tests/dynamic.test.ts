@@ -6,9 +6,9 @@ import {
   us_socket_local_port,
   type us_listen_socket,
 } from "uWebSockets.js";
-import { dynamicServe } from "../mjs/serving.mjs";
-import { urlStartsWith } from "../mjs/helpers.mjs";
-import { HeadersMap } from "@ublitzjs/core";
+import { dynamicServe } from "@ublitzjs/static/serving";
+import { urlStartsWith } from "@ublitzjs/static";
+import { HeadersMap} from "@ublitzjs/core";
 import { unlink, writeFile } from "node:fs/promises";
 var socket: us_listen_socket;
 var port: number;
@@ -19,15 +19,27 @@ var methods = dynamicServe(
   /*route regex*/ urlStartsWith("/uploads"),
   /*directory*/ "tests/samples3",
   {
+
     avoid: /*doesn't send these files*/ /.no/,
     logs: true /*logging errors from sending file*/,
     // setting your custom headers ( also is in static versions )
     headers: new HeadersMap({ ...HeadersMap.baseObj })
       .remove("Cross-Origin-Opener-Policy")
       .prepare(),
+    
+    decisionGen: function*(req){
+      var isAuthorized = !!req.getHeader("my-header")
+      var resultingFile = yield;
+      
+      if(/-auth/.test(resultingFile)) return isAuthorized;
+      return true
+    }
   }
 );
-server.get("/*", methods.get).head("/*", methods.head).any("/*", methods.any);
+server
+  .get("/*", methods.get as any)
+  .head("/*", methods.head as any)
+  .any("/*", methods.any as any);
 beforeAll(() => {
   server.listen(0, (token) => {
     port = us_socket_local_port(token);
@@ -94,6 +106,20 @@ describe("dynamic version", { concurrent: true }, () => {
       expect(response.headers["allow"]).toBe("GET, HEAD");
     });
   });
+  it("has validation for authorized files", async () => {
+
+    var results = await Promise.all([
+      request(genLink("/uploads/x-auth.txt")),
+      request(genLink("/uploads/x-auth.txt"), {
+        headers: {
+          "my-header": "true"
+        }
+      })
+    ])
+    expect(results[0].statusCode).toBe(404) //only authorized people should know about these files
+    expect(results[1].statusCode).toBe(200)
+    expect(await results[1].body.text()).toMatch("txt")
+  })
 });
 function testOneCaseOfIndexHtml(url: string) {
   return async () => {

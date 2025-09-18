@@ -1,4 +1,4 @@
-import { HttpControllerFn } from "@ublitzjs/core";
+import { HttpControllerFn, HttpRequest } from "@ublitzjs/core";
 import type { HttpResponse as uwsHttpResponse } from "uWebSockets.js";
 type fileData<full extends boolean> = {
   CT: string;
@@ -98,6 +98,26 @@ export function dynamicServe(
      */
   avoid?: RegExp;
   /**
+  * If case you really know which types you will need to serve, this is a go-to option.
+  * @description It looks like {[file_extension]: mime_type}
+  * @example {"json": "application/json", "css": "text/css"}
+  * */
+  mimes?: Record<string, string>
+  /**
+  *   Generator function, where you decide whether certain files are sent or not. Part before "yield" is called before async code, while another can't access request object
+  *   @example //options:
+  *   {
+       decisionGen: function* (request){
+         var userIsAuthorized = request.getHeader("some-auth-header") == "i am";
+         var theExistingFilePath: string = yield; //here execution pauses until url is verified
+         if(theExistingFilePath.includes("authorized-file"))
+              return userIsAuthorized;
+         return true;
+       } 
+     } 
+   */
+  decisionGen?: (req: HttpRequest)=>Generator<void,boolean,string>
+  /**
    * whether to log errors to console or not
    * @default false
    */
@@ -184,4 +204,6 @@ opts?:{
    */
   requireRange?: boolean 
 }): Record<"get" | "head" | "any", HttpControllerFn>;
+/*Now instead of using "deleteMimesList" option in other functions, you decide when to delete them*/
+export function clearMimes(): void
 type setHeaders = (res: uwsHttpResponse) => uwsHttpResponse;

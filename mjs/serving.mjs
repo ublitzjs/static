@@ -153,143 +153,261 @@ function staticServe({ fullRoute, dirPath, paths }, opts = {}) {
     },
   };
 }
+//function dynamicServe(routeRegex, dirPath, conf = {}) {
+//  var getCurrentPath = (req) =>
+//    dirPath + "/" + req.getUrl().replace(routeRegex, "");
+//  var mrmime = require("mrmime");
+//  return {
+//    async get(res, req) {
+//      registerAbort(res);
+//      var currentPath = getCurrentPath(req);
+//      var range = req.getHeader("range");
+//      //#region find file stats
+//      try {
+//        if (conf.avoid && conf.avoid.test(currentPath))
+//          throw new Error("Avoid regex matched");
+//
+//        var file = await stat(currentPath);
+//        if (file.isDirectory()) {
+//          if(conf.noIndexHtml){
+//            if(res.aborted) return;
+//            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//          }
+//          //#region look for index.html
+//          let str = "";
+//          if (shouldAddDirSlash(currentPath)) str = "/";
+//          currentPath += str + "index.html";
+//          file = await stat(currentPath);
+//          //#endregion
+//        }
+//      } catch {
+//        if (res.aborted) return;
+//        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//      }
+//      //#endregion
+//
+//      if (res.aborted) return;
+//      //#region get "range" header
+//      if (range) {
+//        try {
+//          var { 0: start, 1: end } = getRanges(
+//            range,
+//            file.size - 1,
+//            conf.maxChunk
+//          );
+//          if (end - start + 1 > conf.maxSize)
+//            return res.cork(() =>
+//              res.writeStatus("416").end("Range not satisfiable")
+//            );
+//        } catch (error) {
+//          return res.cork(() => res.writeStatus(c400).end(error.message));
+//        }
+//      } else if (conf.requireRange)
+//        return res.cork(() =>
+//          res.writeStatus(c400).end("Range header required")
+//        );
+//      //#endregion
+//      //#region send file
+//      const err = await sendFile(
+//        {
+//          res,
+//          contentType:
+//            mrmime.lookup(path.extname(currentPath)) ||
+//            "application/octet-stream",
+//          path: currentPath,
+//          maxSize: file.size,
+//        },
+//        {
+//          start,
+//          end,
+//          headers: (res) => {
+//            if (conf.headers) conf.headers(res);
+//            simpleHeaders(res);
+//          },
+//        }
+//      );
+//      if (err && conf.logs) console.error(err);
+//      //#endregion
+//    },
+//    async head(res, req) {
+//      res.onAborted(() => {
+//        res.aborted = true;
+//      });
+//      var currentPath = getCurrentPath(req);
+//      try {
+//        var file = await stat(currentPath);
+//        if (file.isDirectory() /*get html*/) {
+//          if(conf.noIndexHtml){
+//            if(res.aborted) return;
+//            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//          }
+//          let str = "";
+//          if (shouldAddDirSlash(currentPath)) str = "/";
+//          currentPath += str + "index.html";
+//          file = await stat(currentPath);
+//        }
+//      } catch {
+//        if (res.aborted) return;
+//        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//      }
+//      if (res.aborted) return;
+//      res.cork(() => {
+//        if (conf.headers) conf.headers(res);
+//        res
+//          .writeHeader(allowHeaderArray[0], allowHeaderArray[1])
+//          .writeHeader("Content-Type", file.CT)
+//          .endWithoutBody(file.size);
+//      });
+//    },
+//    async any(res, req) {
+//      res.onAborted(() => {
+//        res.aborted = true;
+//      });
+//      var currentPath = getCurrentPath(req);
+//      try {
+//        var file = await stat(currentPath);
+//        if (file.isDirectory() /*get html*/) {
+//          if(conf.noIndexHtml){
+//            if(res.aborted) return;
+//            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//          }
+//          let str = "";
+//          if (shouldAddDirSlash(currentPath)) str = "/";
+//          currentPath += str + "index.html";
+//          file = await stat(currentPath);
+//        }
+//      } catch {
+//        if (res.aborted) return;
+//        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+//      }
+//      if (res.aborted) return;
+//      res.cork(() => {
+//        res.writeStatus(c405);
+//        if (conf.headers) conf.headers(res);
+//        res
+//          .writeHeader(allowHeaderArray[0], allowHeaderArray[1])
+//          .end("Wrong method");
+//      });
+//    },
+//  };
+//}
+var dynamicRangeHandling = ()=>`
+  if (range) {
+    try {
+      var { 0: start, 1: end } = addFns.getRanges(
+        range,
+        file.size - 1,
+        conf.maxChunk
+      );
+      if (end - start + 1 > conf.maxSize)
+        return res.cork(() =>
+          res.writeStatus("416").end("Range not satisfiable")
+        );
+    } catch (error){
+      return res.cork(() => res.writeStatus("400").end(error.message));
+    }
+  } else if (conf.requireRange)
+    return res.cork(() =>
+      res.writeStatus("400").end("Range header required")
+    );
+`
+var dynamicServeFnStructure = (conf)=>`
+  regAb(res);
+  var currentPath = getCurrentPath(req);
+  var range = req.getHeader("range");
+  try{
+    ${conf.avoid ? "if(conf.avoid.test(currentPath))throw new Error(\"Avoid regex matched\");":""}
+    ${conf.decisionGen ? `var decisionGen = conf.decisionGen(req);decisionGen.next();` : ""}
+    var file = await addFns.stat(currentPath);
+    if (file.isDirectory()) {
+      ${conf.noIndexHtml ? `throw new Error("no file");` : `
+      let str = "";
+      if (addFns.addSlash(currentPath)) str = "/";
+      currentPath += str + "index.html";
+      file = await addFns.stat(currentPath);
+      `}
+    }
+  } catch {
+    if (res.aborted) return;
+    return res.cork(() => res.writeStatus("404").end("NOT FOUND"));
+  }
+  if (res.aborted) return;
+`
 function dynamicServe(routeRegex, dirPath, conf = {}) {
   var getCurrentPath = (req) =>
     dirPath + "/" + req.getUrl().replace(routeRegex, "");
-  var mrmime = require("mrmime");
+  if(!conf.mimes) conf.mimes = require("mrmime").mimes;
+  var addFns = {
+    stat, getRanges, sendFile, extname: path.extname, error: console.error, addSlash: shouldAddDirSlash
+  }
   return {
-    async get(res, req) {
-      registerAbort(res);
-      var currentPath = getCurrentPath(req);
-      var range = req.getHeader("range");
-      //#region find file stats
-      try {
-        if (conf.avoid && conf.avoid.test(currentPath))
-          throw new Error("Avoid regex matched");
-
-        var file = await stat(currentPath);
-        if (file.isDirectory()) {
-          if(conf.noIndexHtml){
-            if(res.aborted) return;
-            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
-          }
-          //#region look for index.html
-          let str = "";
-          if (shouldAddDirSlash(currentPath)) str = "/";
-          currentPath += str + "index.html";
-          file = await stat(currentPath);
-          //#endregion
-        }
-      } catch {
-        if (res.aborted) return;
-        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
-      }
-      //#endregion
-
-      if (res.aborted) return;
-      //#region get "range" header
-      if (range) {
-        try {
-          var { 0: start, 1: end } = getRanges(
-            range,
-            file.size - 1,
-            conf.maxChunk
-          );
-          if (end - start + 1 > conf.maxSize)
-            return res.cork(() =>
-              res.writeStatus("416").end("Range not satisfiable")
-            );
-        } catch (error) {
-          return res.cork(() => res.writeStatus(c400).end(error.message));
-        }
-      } else if (conf.requireRange)
-        return res.cork(() =>
-          res.writeStatus(c400).end("Range header required")
-        );
-      //#endregion
-      //#region send file
-      const err = await sendFile(
-        {
-          res,
-          contentType:
-            mrmime.lookup(path.extname(currentPath)) ||
-            "application/octet-stream",
-          path: currentPath,
-          maxSize: file.size,
-        },
-        {
-          start,
-          end,
-          headers: (res) => {
-            if (conf.headers) conf.headers(res);
-            simpleHeaders(res);
+    get: new Function(
+      "regAb",
+      "getCurrentPath",
+      "conf",
+      "addFns",
+      "simpleHeaders",
+      `return async(res,req)=>{
+      ${dynamicServeFnStructure(conf)}
+      ${dynamicRangeHandling()}
+      ${conf.decisionGen ? "if(!decisionGen.next(currentPath).value)return res.cork(()=>res.writeStatus(\"404\").end(\"Not Found\"))" : ""}
+        const err = await addFns.sendFile({
+            res,
+            contentType:
+              conf.mimes[addFns.extname(currentPath).slice(1)] ||
+              "application/octet-stream",
+            path: currentPath,
+            maxSize: file.size,
           },
-        }
-      );
-      if (err && conf.logs) console.error(err);
-      //#endregion
-    },
-    async head(res, req) {
-      res.onAborted(() => {
-        res.aborted = true;
-      });
-      var currentPath = getCurrentPath(req);
-      try {
-        var file = await stat(currentPath);
-        if (file.isDirectory() /*get html*/) {
-          if(conf.noIndexHtml){
-            if(res.aborted) return;
-            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
+          {
+            start,
+            end,
+            headers: (res) => {
+              if (conf.headers) conf.headers(res);
+              simpleHeaders(res);
+            },
           }
-          let str = "";
-          if (shouldAddDirSlash(currentPath)) str = "/";
-          currentPath += str + "index.html";
-          file = await stat(currentPath);
-        }
-      } catch {
-        if (res.aborted) return;
-        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
-      }
-      if (res.aborted) return;
-      res.cork(() => {
-        if (conf.headers) conf.headers(res);
-        res
-          .writeHeader(allowHeaderArray[0], allowHeaderArray[1])
-          .writeHeader("Content-Type", file.CT)
-          .endWithoutBody(file.size);
-      });
-    },
-    async any(res, req) {
-      res.onAborted(() => {
-        res.aborted = true;
-      });
-      var currentPath = getCurrentPath(req);
-      try {
-        var file = await stat(currentPath);
-        if (file.isDirectory() /*get html*/) {
-          if(conf.noIndexHtml){
-            if(res.aborted) return;
-            return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
-          }
-          let str = "";
-          if (shouldAddDirSlash(currentPath)) str = "/";
-          currentPath += str + "index.html";
-          file = await stat(currentPath);
-        }
-      } catch {
-        if (res.aborted) return;
-        return res.cork(() => res.writeStatus(c404).end("NOT FOUND"));
-      }
-      if (res.aborted) return;
-      res.cork(() => {
-        res.writeStatus(c405);
-        if (conf.headers) conf.headers(res);
-        res
-          .writeHeader(allowHeaderArray[0], allowHeaderArray[1])
-          .end("Wrong method");
-      });
-    },
-  };
+        );
+        ${conf.logs ? "if(err) addFns.error(err)":""}
+      }`
+    )(registerAbort, getCurrentPath, conf, addFns, simpleHeaders),
+    head: new Function(
+      "regAb",
+      "getCurrentPath",
+      "conf",
+      "addFns",
+      `return async(res,req)=>{
+        ${dynamicServeFnStructure(conf)}
+        ${dynamicRangeHandling()}
+      ${conf.decisionGen ? "if(!decisionGen.next(currentPath).value)return res.cork(()=>res.writeStatus(\"404\").end(\"Not Found\"))" : ""}
+        var CT = conf.mimes[addFns.extname(currentPath).slice(1)]
+        res.cork(() => {
+          if (conf.headers) conf.headers(res);
+          res
+            .writeHeader("Allow", "GET, HEAD")
+            .writeHeader("Content-Type", CT)
+            .endWithoutBody(file.size);
+        });
+      }`
+    )(registerAbort, getCurrentPath, conf, addFns),
+    any: new Function(
+      "regAb",
+      "getCurrentPath",
+      "conf",
+      "addFns",
+      `return async(res,req)=>{
+        ${dynamicServeFnStructure(conf)}
+        ${conf.decisionGen ? "if(!decisionGen.next(currentPath).value)return res.cork(()=>res.writeStatus(\"404\").end(\"Not Found\"))" : ""}
+        res.cork(() => {
+          res.writeStatus("405");
+          if (conf.headers) conf.headers(res);
+          res
+            .writeHeader("Allow", "GET, HEAD")
+            .end("Wrong method");
+        });
+      }`
+    )(registerAbort, getCurrentPath, conf, addFns)
+  }
 }
 
 function createFileMonolithForStaticMulti(folders, fallback, req) {
@@ -416,4 +534,7 @@ function setIndexHtmlOnMonolith(monolith, paths) {
   monolith.givenUrl += slash + "index.html";
   monolith.file = paths[monolith.givenUrl];
 }
-export { staticServe, staticServeMulti, dynamicServe, analyzeFolder };
+function clearMimes(){
+  deepDeleteFromCache(require.resolve("mrmime"))
+}
+export { staticServe, staticServeMulti, dynamicServe, analyzeFolder, clearMimes };
