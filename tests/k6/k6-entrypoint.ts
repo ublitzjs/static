@@ -6,10 +6,10 @@ var endpoint = __ENV.ENDPOINT!; //also means size of file
 var port = __ENV.PORT!;
 
 export var options: Options = {
-  duration: '5s',
-  vus: 50,
+  duration: '2s',
+  vus: 5,
   thresholds: {
-    http_req_duration: ['p(95)<8000'], // 8 seconds for github actions (my pc handles under 2.5)
+    http_req_duration: ['p(95)<2000'],
     http_req_failed: ['rate==0'],
   }
 } 
